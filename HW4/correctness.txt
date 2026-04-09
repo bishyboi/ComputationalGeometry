@@ -1,0 +1,13 @@
+# Correctness
+
+The algorithm follows the process of the already proven paraboloid projection method for Delaunay Triangulation. Rather than taking the points that are closest, we want the region that is *furthest*. For this reason, we take the upper faces of the convex hull, such that the region preserved, relative to a face, corresponds strictly to the points structurally furthest away from the vertices of that face. 
+
+Projecting these 3D upper faces back down to the 2D plane gives us the strictly defined Farthest-Point Delaunay Triangulation (FPDT). Because only points on the mathematical boundary of a set can ever be the furthest from any arbitrary coordinate in the plane, this algorithm correctly filters and strictly triangulates only the vertices that form the 2D convex hull.
+
+Once the FPDT is properly established, the algorithm constructs the Farthest-Point Voronoi Diagram by perfectly exploiting the geometric duality between the two graphs:
+
+1. **Voronoi Vertices:** The absolute vertices of our Farthest-Point Voronoi Diagram are exactly identically located at the circumcenters of the triangles in the FPDT. 
+2. **Bounded Edges:** To map the internal structure, the algorithm draws a bounded Voronoi edge connecting the circumcenters of any two FPDT triangles that share a common edge (meaning they intersect at exactly two vertices).
+3. **Unbounded Regions (Rays):** Unlike standard Voronoi partitions (which form around internal points), Farthest-Point Voronoi cells are inherently unbounded because they exclusively map the convex hull vertices. For every triangle edge that acts as an outer boundary to the FPDT, its corresponding Voronoi edge must stretch to infinity. The algorithm handles this by extending a ray along the perpendicular bisector of the boundary edge. Because of the "farthest-point" inversion, this ray must correctly point linearly *inward* to cross the center of the polygon, naturally defining the strict half-plane horizons where each outer vertex dominates as the furthest point.
+
+By utilizing this rigorously proven 3D functional upper-hull projection paired with an exact tracing of the circumcenter dual-graph, the resulting output is mathematically guaranteed to be the exact and accurate Farthest-Point Voronoi Diagram.
