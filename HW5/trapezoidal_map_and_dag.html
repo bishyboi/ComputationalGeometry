@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trapezoidal Map T(S) & Search Structure D</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f4f0;
+    --bg3: #eceae4;
+    --text: #1a1a18;
+    --text2: #6b6b66;
+    --text3: #9b9b94;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font: 'Georgia', serif;
+    --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --blue: #3B8BD4;
+    --teal: #1D9E75;
+    --amber: #EF9F27;
+    --coral: #D85A30;
+    --purple: #8B5CF6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1917;
+      --bg2: #232220;
+      --bg3: #2c2b28;
+      --text: #e8e6df;
+      --text2: #9b9b94;
+      --text3: #6b6b66;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.2);
+    }
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+  h1 {
+    font-family: var(--font);
+    font-size: 1.6rem;
+    font-weight: normal;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 1.5rem;
+    font-style: italic;
+    font-family: var(--font);
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  .panel {
+    background: var(--bg);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+  }
+  .tab-row { display: flex; gap: 6px; margin-bottom: 1rem; }
+  .tab {
+    padding: 6px 16px;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--text2);
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab:hover { background: var(--bg2); }
+  .tab.active {
+    background: var(--bg2);
+    color: var(--text);
+    border-color: var(--border2);
+    font-weight: 500;
+  }
+  .step-info {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 10px;
+    min-height: 40px;
+    line-height: 1.6;
+  }
+  .step-info strong { color: var(--text); }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  button {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    background: transparent;
+    color: var(--text2);
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--bg2); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 16px; height: 10px; border-radius: 2px; }
+  svg text { font-family: var(--font-sans); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Trapezoidal Map T(S) &amp; Search Structure D</h1>
+  <p class="subtitle">Computational geometry — incremental construction for 5 horizontal segments</p>
+  <div class="panel">
+    <div class="tab-row">
+      <button class="tab active" onclick="switchTab('trap')">Trapezoidal map T(S)</button>
+      <button class="tab" onclick="switchTab('dag')">Search structure D (DAG)</button>
+      <button class="tab" onclick="switchTab('theory')">How it works</button>
+    </div>
+
+    <!-- TAB: Trapezoidal Map -->
+    <div id="tab-trap">
+      <div class="step-info" id="trap-info">
+        <strong>Step 0 — Bounding box only.</strong> T(S) is one big trapezoid (the box itself). D has a single leaf node.
+      </div>
+      <svg width="100%" viewBox="0 0 640 310" id="trap-svg">
+        <defs>
+          <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <rect x="40" y="20" width="560" height="270" fill="none" stroke="#9b9b94" stroke-width="1" rx="2"/>
+        <g id="trap-fills"></g>
+        <g id="vert-lines"></g>
+        <g id="segs"></g>
+        <g id="trap-labels"></g>
+      </svg>
+      <div class="legend">
+        <div class="legend-item"><div class="swatch" style="background:#3B8BD4;opacity:0.5;border:1px solid #3B8BD4"></div> Trapezoid region</div>
+        <div class="legend-item"><div class="swatch" style="background:none;border:1px dashed #888;"></div> Vertical extension</div>
+      </div>
+      <div class="btn-row">
+        <button id="prev-btn" onclick="prevStep()" disabled>← Previous</button>
+        <button id="next-btn" onclick="nextStep()">Next segment →</button>
+      </div>
+    </div>
+
+    <!-- TAB: DAG -->
+    <div id="tab-dag" style="display:none">
+      <div class="step-info">
+        The DAG after inserting all 5 segments. <strong>X-nodes</strong> = endpoints (test left/right), <strong>Y-nodes</strong> = segments (test above/below), <strong>leaves</strong> = trapezoid regions.
+      </div>
+      <svg width="100%" viewBox="0 0 640 520" id="dag-svg">
+        <defs>
+          <marker id="darr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <g id="dag-edges"></g>
+        <g id="dag-nodes"></g>
+      </svg>
+      <div class="legend">
+        <div class="legend-item"><div class="swatch" style="background:#3B8BD450;border:1.5px solid #3B8BD4"></div> X-node (endpoint test)</div>
+        <div class="legend-item"><div class="swatch" style="background:#1D9E7550;border:1.5px solid #1D9E75"></div> Y-node (segment test)</div>
+        <div class="legend-item"><div class="swatch" style="background:#EF9F2750;border:1.5px solid #EF9F27"></div> Leaf (trapezoid)</div>
+      </div>
+    </div>
+
+    <!-- TAB: Theory -->
+    <div id="tab-theory" style="display:none">
+      <svg width="100%" viewBox="0 0 640 380">
+        <defs>
+          <marker id="tarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <rect x="30" y="15" width="580" height="190" fill="none" stroke="#9b9b94" stroke-width="1" rx="4"/>
+        <line x1="150" y1="105" x2="430" y2="105" stroke="#1D9E75" stroke-width="2.5"/>
+        <circle cx="150" cy="105" r="4" fill="#1D9E75"/>
+        <circle cx="430" cy="105" r="4" fill="#1D9E75"/>
+        <line x1="150" y1="16" x2="150" y2="104" stroke="#888" stroke-width="1" stroke-dasharray="4 3"/>
+        <line x1="150" y1="106" x2="150" y2="204" stroke="#888" stroke-width="1" stroke-dasharray="4 3"/>
+        <line x1="430" y1="16" x2="430" y2="104" stroke="#888" stroke-width="1" stroke-dasharray="4 3"/>
+        <line x1="430" y1="106" x2="430" y2="204" stroke="#888" stroke-width="1" stroke-dasharray="4 3"/>
+        <rect x="31" y="16" width="118" height="188" fill="#3B8BD4" opacity="0.08"/>
+        <rect x="151" y="16" width="278" height="88" fill="#1D9E75" opacity="0.1"/>
+        <rect x="151" y="107" width="278" height="97" fill="#EF9F27" opacity="0.1"/>
+        <rect x="431" y="16" width="178" height="188" fill="#3B8BD4" opacity="0.08"/>
+        <text x="90" y="115" text-anchor="middle" font-size="13" fill="#6b6b66">A</text>
+        <text x="290" y="70" text-anchor="middle" font-size="13" fill="#6b6b66">B (above s)</text>
+        <text x="290" y="165" text-anchor="middle" font-size="13" fill="#6b6b66">C (below s)</text>
+        <text x="520" y="115" text-anchor="middle" font-size="13" fill="#6b6b66">D</text>
+        <text x="150" y="215" text-anchor="middle" font-size="12" fill="#9b9b94">p (left endpt)</text>
+        <text x="430" y="215" text-anchor="middle" font-size="12" fill="#9b9b94">q (right endpt)</text>
+        <text x="290" y="108" text-anchor="middle" font-size="13" fill="#1D9E75" font-weight="500">s</text>
+        <text x="320" y="255" text-anchor="middle" font-size="13" fill="#6b6b66">Corresponding DAG for inserting just s:</text>
+        <rect x="250" y="265" width="60" height="30" rx="6" fill="#3B8BD420" stroke="#3B8BD4" stroke-width="1.2"/>
+        <text x="280" y="284" text-anchor="middle" font-size="12" fill="#185FA5" font-weight="500">X: p</text>
+        <line x1="268" y1="295" x2="160" y2="325" stroke="#9b9b94" stroke-width="0.8" marker-end="url(#tarr)"/>
+        <rect x="125" y="325" width="50" height="28" rx="5" fill="#EF9F2730" stroke="#EF9F27" stroke-width="1"/>
+        <text x="150" y="343" text-anchor="middle" font-size="12" fill="#633806">Leaf A</text>
+        <line x1="292" y1="295" x2="400" y2="325" stroke="#9b9b94" stroke-width="0.8" marker-end="url(#tarr)"/>
+        <rect x="365" y="325" width="60" height="30" rx="6" fill="#3B8BD420" stroke="#3B8BD4" stroke-width="1.2"/>
+        <text x="395" y="344" text-anchor="middle" font-size="12" fill="#185FA5" font-weight="500">X: q</text>
+        <line x1="407" y1="355" x2="490" y2="378" stroke="#9b9b94" stroke-width="0.8" marker-end="url(#tarr)"/>
+        <rect x="462" y="355" width="52" height="28" rx="5" fill="#EF9F2730" stroke="#EF9F27" stroke-width="1"/>
+        <text x="488" y="373" text-anchor="middle" font-size="12" fill="#633806">Leaf D</text>
+        <line x1="383" y1="355" x2="310" y2="378" stroke="#9b9b94" stroke-width="0.8" marker-end="url(#tarr)"/>
+        <rect x="270" y="355" width="60" height="28" rx="6" fill="#1D9E7530" stroke="#1D9E75" stroke-width="1.2"/>
+        <text x="300" y="373" text-anchor="middle" font-size="12" fill="#085041" font-weight="500">Y: s</text>
+        <line x1="288" y1="383" x2="220" y2="358" stroke="#9b9b94" stroke-width="0.8" marker-end="url(#tarr)"/>
+        <rect x="183" y="355" width="52" height="28" rx="5" fill="#EF9F2730" stroke="#EF9F27" stroke-width="1"/>
+        <text x="209" y="372" text-anchor="middle" font-size="12" fill="#633806">Leaf B</text>
+        <text x="207" y="353" text-anchor="middle" font-size="10" fill="#9b9b94">above</text>
+        <text x="308" y="353" text-anchor="middle" font-size="10" fill="#9b9b94">below</text>
+        <line x1="312" y1="383" x2="370" y2="358" stroke="#9b9b94" stroke-width="0.8" marker-end="url(#tarr)"/>
+        <rect x="348" y="355" width="52" height="28" rx="5" fill="#EF9F2730" stroke="#EF9F27" stroke-width="1"/>
+        <text x="374" y="372" text-anchor="middle" font-size="12" fill="#633806">Leaf C</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<script>
+const segsData = [
+  { x1:40,  y1:80,  x2:600, y2:80,  label:'s1', color:'#3B8BD4' },
+  { x1:80,  y1:130, x2:560, y2:130, label:'s2', color:'#1D9E75' },
+  { x1:120, y1:175, x2:520, y2:175, label:'s3', color:'#EF9F27' },
+  { x1:200, y1:215, x2:440, y2:215, label:'s4', color:'#D85A30' },
+  { x1:260, y1:248, x2:380, y2:248, label:'s5', color:'#8B5CF6' },
+];
+let step = 0;
+const trapInfos = [
+  '<strong>Step 0 — Bounding box only.</strong> T(S) is one big trapezoid (the box itself). D has a single leaf node.',
+  '<strong>Step 1 — Insert s1</strong> (top-most segment). Vertical lines drop from both endpoints. The bounding box is split into 3 trapezoids: left of s1, above-middle, below-middle.',
+  '<strong>Step 2 — Insert s2.</strong> Its endpoints generate more vertical walls, splitting existing trapezoids. Each new endpoint adds at most 2 new trapezoids.',
+  '<strong>Step 3 — Insert s3.</strong> The pattern continues — endpoints shoot verticals up & down to the nearest boundary.',
+  '<strong>Step 4 — Insert s4</strong> (shorter segment). Verticals from its endpoints only reach the nearest segment above/below.',
+  '<strong>Step 5 — Insert s5</strong> (innermost). T(S) is complete. With n=5 horizontal segments, we get O(n) trapezoids.',
+];
+
+const BOX = {x:40, y:20, w:560, h:270};
+
+function ns(tag) { return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+
+function drawTrap() {
+  const fills = document.getElementById('trap-fills');
+  const vlines = document.getElementById('vert-lines');
+  const segG = document.getElementById('segs');
+  const labels = document.getElementById('trap-labels');
+  fills.innerHTML = ''; vlines.innerHTML = ''; segG.innerHTML = ''; labels.innerHTML = '';
+  const active = segsData.slice(0, step);
+
+  if (step === 0) {
+    const r = ns('rect');
+    r.setAttribute('x',41); r.setAttribute('y',21); r.setAttribute('width',558); r.setAttribute('height',268);
+    r.setAttribute('fill','#3B8BD4'); r.setAttribute('opacity','0.07');
+    fills.appendChild(r);
+    addLabel(labels, 320, 160, 'τ₀ (whole box)', '#3B8BD4');
+  }
+
+  active.forEach((s, i) => {
+    [s.x1, s.x2].forEach(ex => {
+      let topY = BOX.y + 1;
+      let botY = BOX.y + BOX.h - 1;
+      for (let j = 0; j < i; j++) {
+        const ps = segsData[j];
+        if (ex >= ps.x1 && ex <= ps.x2) {
+          if (ps.y1 < s.y1) topY = Math.max(topY, ps.y1);
+          if (ps.y1 > s.y1) botY = Math.min(botY, ps.y1);
+        }
+      }
+      drawDash(vlines, ex, topY, ex, s.y1 - 1);
+      drawDash(vlines, ex, s.y1 + 1, ex, botY);
+    });
+  });
+
+  active.forEach((s, i) => {
+    const l = ns('line');
+    l.setAttribute('x1',s.x1); l.setAttribute('y1',s.y1);
+    l.setAttribute('x2',s.x2); l.setAttribute('y2',s.y2);
+    l.setAttribute('stroke',s.color); l.setAttribute('stroke-width','2.5');
+    l.setAttribute('stroke-linecap','round');
+    segG.appendChild(l);
+    [s.x1, s.x2].forEach(ex => {
+      const c = ns('circle');
+      c.setAttribute('cx',ex); c.setAttribute('cy',s.y1); c.setAttribute('r','4');
+      c.setAttribute('fill',s.color);
+      segG.appendChild(c);
+    });
+    const t = ns('text');
+    t.setAttribute('x', s.x2 + 8); t.setAttribute('y', s.y1 + 4);
+    t.setAttribute('font-size','12'); t.setAttribute('fill',s.color);
+    t.setAttribute('font-weight','500');
+    t.textContent = s.label;
+    segG.appendChild(t);
+  });
+
+  document.getElementById('trap-info').innerHTML = trapInfos[step];
+  document.getElementById('prev-btn').disabled = step === 0;
+  document.getElementById('next-btn').disabled = step === segsData.length;
+  document.getElementById('next-btn').textContent = step < segsData.length ? 'Next segment →' : '✓ Done';
+}
+
+function addLabel(g, x, y, text, color) {
+  const t = ns('text');
+  t.setAttribute('x',x); t.setAttribute('y',y);
+  t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','12');
+  t.setAttribute('fill',color); t.setAttribute('opacity','0.6');
+  t.textContent = text;
+  g.appendChild(t);
+}
+
+function drawDash(g, x1,y1,x2,y2) {
+  if (Math.abs(y2-y1) < 2) return;
+  const l = ns('line');
+  l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);
+  l.setAttribute('stroke','#9b9b94');l.setAttribute('stroke-width','0.8');
+  l.setAttribute('stroke-dasharray','4 3');
+  g.appendChild(l);
+}
+
+function nextStep() { if(step < segsData.length) { step++; drawTrap(); } }
+function prevStep() { if(step > 0) { step--; drawTrap(); } }
+
+function drawDAG() {
+  const edgeG = document.getElementById('dag-edges');
+  const nodeG = document.getElementById('dag-nodes');
+  edgeG.innerHTML = ''; nodeG.innerHTML = '';
+
+  const nodes = [
+    { id:'xs1l', x:320, y:30,  type:'X', label:'X: p(s1)', color:'#3B8BD4' },
+    { id:'leaf_A', x:120, y:100, type:'L', label:'τ: left' },
+    { id:'xs1r', x:440, y:100, type:'X', label:'X: q(s1)', color:'#3B8BD4' },
+    { id:'ys1', x:320, y:170, type:'Y', label:'Y: s1', color:'#1D9E75' },
+    { id:'leaf_D', x:560, y:170, type:'L', label:'τ: far-R' },
+    { id:'xs2l', x:200, y:240, type:'X', label:'X: p(s2)', color:'#3B8BD4' },
+    { id:'xs3l', x:440, y:240, type:'X', label:'X: p(s3)', color:'#3B8BD4' },
+    { id:'leaf_E', x:100, y:310, type:'L', label:'τ: E' },
+    { id:'ys2', x:280, y:310, type:'Y', label:'Y: s2', color:'#1D9E75' },
+    { id:'ys3', x:440, y:310, type:'Y', label:'Y: s3', color:'#1D9E75' },
+    { id:'leaf_ab', x:160, y:380, type:'L', label:'τ: above s2' },
+    { id:'xs4', x:340, y:380, type:'X', label:'X: p(s4)', color:'#3B8BD4' },
+    { id:'leaf_bc', x:520, y:380, type:'L', label:'τ: mid' },
+    { id:'leaf_s5', x:260, y:450, type:'L', label:'τ: inner' },
+    { id:'ys5', x:420, y:450, type:'Y', label:'Y: s5', color:'#8B5CF6' },
+  ];
+  const edges = [
+    ['xs1l','leaf_A'],['xs1l','xs1r'],
+    ['xs1r','ys1'],['xs1r','leaf_D'],
+    ['ys1','xs2l'],['ys1','xs3l'],
+    ['xs2l','leaf_E'],['xs2l','ys2'],
+    ['xs3l','ys3'],['xs3l','leaf_bc'],
+    ['ys2','leaf_ab'],['ys2','xs4'],
+    ['ys3','xs4'],['ys3','leaf_bc'],
+    ['xs4','leaf_s5'],['xs4','ys5'],
+    ['ys5','leaf_ab'],['ys5','leaf_bc'],
+  ];
+
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  edges.forEach(([a,b]) => {
+    const na = nodeMap[a], nb = nodeMap[b];
+    const l = ns('line');
+    l.setAttribute('x1',na.x); l.setAttribute('y1',na.y+18);
+    l.setAttribute('x2',nb.x); l.setAttribute('y2',nb.y-18);
+    l.setAttribute('stroke','#9b9b94'); l.setAttribute('stroke-width','0.8');
+    l.setAttribute('marker-end','url(#darr)');
+    edgeG.appendChild(l);
+  });
+
+  nodes.forEach(n => {
+    const g = ns('g');
+    const r = ns('rect');
+    const w = n.type==='L' ? 78 : 88, h = 28;
+    r.setAttribute('x', n.x - w/2); r.setAttribute('y', n.y - h/2);
+    r.setAttribute('width', w); r.setAttribute('height', h); r.setAttribute('rx','6');
+    if (n.type === 'X') { r.setAttribute('fill','#3B8BD420'); r.setAttribute('stroke','#3B8BD4'); r.setAttribute('stroke-width','1'); }
+    else if (n.type === 'Y') { r.setAttribute('fill', n.color+'30'); r.setAttribute('stroke', n.color); r.setAttribute('stroke-width','1'); }
+    else { r.setAttribute('fill','#EF9F2725'); r.setAttribute('stroke','#EF9F27'); r.setAttribute('stroke-width','0.8'); }
+    const t = ns('text');
+    t.setAttribute('x', n.x); t.setAttribute('y', n.y);
+    t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-size','11');
+    let tc = n.type==='X' ? '#185FA5' : n.type==='Y' ? '#085041' : '#633806';
+    if (n.color === '#8B5CF6') tc = '#4B1B8C';
+    t.setAttribute('fill', tc);
+    t.setAttribute('font-weight', n.type==='L' ? '400' : '500');
+    t.textContent = n.label;
+    g.appendChild(r); g.appendChild(t);
+    nodeG.appendChild(g);
+  });
+}
+
+function switchTab(t) {
+  document.getElementById('tab-trap').style.display = t==='trap' ? '' : 'none';
+  document.getElementById('tab-dag').style.display  = t==='dag'  ? '' : 'none';
+  document.getElementById('tab-theory').style.display = t==='theory' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach((b,i) => {
+    b.classList.toggle('active', ['trap','dag','theory'][i]===t);
+  });
+  if (t==='dag') drawDAG();
+}
+
+drawTrap();
+</script>
+</body>
+</html>
